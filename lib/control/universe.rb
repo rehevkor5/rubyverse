@@ -1,7 +1,6 @@
 require 'rmath3d/rmath3d'
 
 require_relative '../view/renderer'
-# require_relative '../model/body'
 
 class Universe
   TIME_PER_TICK = 0.0001
@@ -43,11 +42,7 @@ class Universe
 
     body_forces.each do |body, forces|
       cumulative_force = forces.inject do |cumulative_force, force|
-        # if cumulative_force.nil?
-        #   force
-        # else
-          cumulative_force + force
-        # end
+        cumulative_force + force
       end
 
       delta_v_x = cumulative_force.x * TIME_PER_TICK / body.mass
