@@ -7,6 +7,8 @@ require 'glut'
 
 require_relative 'opengl_sugar/open_gl_sugar'
 require_relative 'control/universe'
+require_relative 'control/default_keyboard_controller'
+require_relative 'model/camera'
 require_relative 'model/body'
 
 class Rubyverse
@@ -22,8 +24,7 @@ class Rubyverse
   def run(*args)
     @width = 800.0
     @height = 600.0
-
-    @view_angle = 0
+    @camera = Camera.new
 
     Glut.glutInit
     Glut.glutInitWindowPosition(0, 0)
@@ -33,16 +34,14 @@ class Rubyverse
     @zoom_factor = 1.0
     @window = Glut.glutCreateWindow('Rubyverse')
 
+    glutReshapeFunc(method(:reshape).to_proc)
     glutDisplayFunc(method(:render).to_proc)
     glutIdleFunc(method(:idle).to_proc)
-
     glClearColor(0.0, 0.0, 0.1, 0)
     glShadeModel(GL_SMOOTH)
+    self.keyboard_controller = DefaultKeyboardController.new(@camera)
 
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity
-    gluPerspective(50.0 * @zoom_factor, @width / @height, NEAR_PLANE, FAR_PLANE)
-    glMatrixMode(GL_MODELVIEW)
+    reshape(@width, @height)
 
     glEnable(GL_CULL_FACE)
     glEnable(GL_DEPTH_TEST)
@@ -64,18 +63,39 @@ class Rubyverse
     )
   end
 
+  def keyboard_controller=(keyboard_controller)
+    @keyboard_controller = keyboard_controller
+    @keyboard_controller.attach
+  end
+
+  def reshape(w, h)
+    @width = w
+    # Prevent a divide by zero, when window is too short
+    # (you cant make a window of zero width).
+    @height = h || 1.0
+    ratio = 1.0 * @width / @height
+
+    # Use the Projection Matrix
+    glMatrixMode(GL_PROJECTION)
+
+    # Reset Matrix
+    glLoadIdentity
+
+    # Set the viewport to be the entire window
+    glViewport(0, 0, @width, @height)
+
+    # Set the correct perspective.
+    gluPerspective(50.0 * @zoom_factor, ratio, NEAR_PLANE, FAR_PLANE)
+
+    # Get Back to the Modelview
+    glMatrixMode(GL_MODELVIEW)
+  end
+
   def render
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity
-
     # Camera
-    glTranslatef(0, 0, -50)
-    # gluLookAt(0, 30, 0, 0, 0, 0, 0, 0, 1)
-    # rotation_degrees_per_frame = 0.0
-    # @view_angle = (rotation_degrees_per_frame + @view_angle) % 360
-    # glRotate(@view_angle, 0, 1, 0)
+    @camera.render
 
     # Lights
     transform do
@@ -84,19 +104,13 @@ class Rubyverse
       glLightfv(GL_LIGHT0, GL_POSITION, [-0.5, 0, 0.8, 0])
     end
 
-    # Objects
-    # transform do
-    #   glTranslatef(-1, 0, -5)
-    #   glMaterialfv(GL_FRONT, GL_DIFFUSE, [0.8, 0.9, 0.8, 1])
-    #   Glut.glutSolidSphere(2, 40, 40)
-    # end
-
     @universe.render
 
     Glut.glutSwapBuffers
   end
 
   def idle
+    @camera.run_simulation_tick
     @universe.run_simulation_tick
     glutPostRedisplay
   end
